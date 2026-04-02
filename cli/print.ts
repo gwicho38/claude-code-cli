@@ -559,13 +559,15 @@ export async function runHeadless(
   // even with pending Promises if there are no active handles. This ref'd
   // interval prevents that. Must be set BEFORE any async work.
   const _earlyKeepAlive = setInterval(() => {}, 30_000);
+  process.on('uncaughtException', (e) => process.stderr.write(`[dev-trace] UNCAUGHT: ${e.stack}\n`));
+  process.on('unhandledRejection', (e: any) => process.stderr.write(`[dev-trace] UNHANDLED: ${e?.stack ?? e}\n`));
 
-  process.stderr.write('[dev-trace] runHeadless: checking grove\n');
+  // process.stderr.write('[dev-trace] runHeadless: checking grove\n');
   if (await isQualifiedForGrove()) {
-    process.stderr.write('[dev-trace] runHeadless: grove qualified\n');
+    // process.stderr.write('[dev-trace] runHeadless: grove qualified\n');
     await checkGroveForNonInteractive()
   }
-  process.stderr.write('[dev-trace] runHeadless: grove done\n');
+  // process.stderr.write('[dev-trace] runHeadless: grove done\n');
   headlessProfilerCheckpoint('after_grove_check')
 
   // Initialize GrowthBook so feature flags take effect in headless mode.
@@ -592,9 +594,9 @@ export async function runHeadless(
     return
   }
 
-  process.stderr.write('[dev-trace] runHeadless: getting structuredIO\n');
+  // process.stderr.write('[dev-trace] runHeadless: getting structuredIO\n');
   const structuredIO = getStructuredIO(inputPrompt, options)
-  process.stderr.write('[dev-trace] runHeadless: got structuredIO\n');
+  // process.stderr.write('[dev-trace] runHeadless: got structuredIO\n');
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
   // prints, dependency console.log, library banners) breaks the client's
@@ -684,13 +686,13 @@ export async function runHeadless(
     })
   }
 
-  process.stderr.write('[dev-trace] runHeadless: past sandbox\n');
+  // process.stderr.write('[dev-trace] runHeadless: past sandbox\n');
   if (options.setupTrigger) {
     await processSetupHooks(options.setupTrigger)
   }
 
   headlessProfilerCheckpoint('before_loadInitialMessages')
-  process.stderr.write('[dev-trace] runHeadless: loading initial messages\n');
+  // process.stderr.write('[dev-trace] runHeadless: loading initial messages\n');
   const appState = getAppState()
   const {
     messages: initialMessages,
@@ -854,9 +856,9 @@ export async function runHeadless(
 
   // Ensure model strings are initialized before generating model options.
   // For Bedrock users, this waits for the profile fetch to get correct region strings.
-  process.stderr.write('[dev-trace] runHeadless: ensuring model strings\n');
+  // process.stderr.write('[dev-trace] runHeadless: ensuring model strings\n');
   await ensureModelStringsInitialized()
-  process.stderr.write('[dev-trace] runHeadless: model strings done\n');
+  // process.stderr.write('[dev-trace] runHeadless: model strings done\n');
   headlessProfilerCheckpoint('after_modelStrings')
 
   // UDS inbox store registration is deferred until after `run` is defined
@@ -884,11 +886,11 @@ export async function runHeadless(
   // action handler. Bun/Node see exitCode set + empty microtask queue and exit
   // before the async streaming generator produces its first value. Delete
   // exitCode so the process stays alive until gracefulShutdownSync sets it.
-  process.stderr.write('[dev-trace] B\n');
+  // process.stderr.write('[dev-trace] B\n');
   // delete process.exitCode;  // DISABLED — causes Bun to exit
-  process.stderr.write('[dev-trace] C\n');
+  // process.stderr.write('[dev-trace] C\n');
   const keepAlive = setInterval(() => {}, 60_000);
-  process.stderr.write('[dev-trace] D\n');
+  // process.stderr.write('[dev-trace] D\n');
   const _origExit = process.exit;
   (process as any).exit = (code?: number) => { process.stderr.write(`[dev-trace] EXIT(${code}) at ${new Error().stack?.split('\n')[2]?.trim()}\n`); _origExit(code as any); };
   try {
@@ -912,7 +914,7 @@ export async function runHeadless(
     process.stderr.write(`[dev-trace] runHeadlessStreaming THREW: ${e?.message}\n${e?.stack}\n`);
     throw e;
   }
-  process.stderr.write('[dev-trace] runHeadless: got streamIterable, iterating...\n');
+  // process.stderr.write('[dev-trace] runHeadless: got streamIterable, iterating...\n');
   for await (const message of streamIterable) {
     if (transformToStreamlined) {
       // Streamlined mode: transform messages and stream immediately
@@ -2464,6 +2466,7 @@ async function runHeadlessStreaming(
         }
       }
     } catch (error) {
+      process.stderr.write(`[dev-trace] run() caught: ${error instanceof Error ? error.stack : error}\n`);
       // Emit error result message before shutting down
       // Write directly to structuredIO to ensure immediate delivery
       try {
@@ -2852,10 +2855,10 @@ async function runHeadlessStreaming(
   // processing and returning the result of the generation.
   // The process is complete when the input stream completes and
   // the last generation of the queue has complete.
-  void (async () => {
+  void (async () => { try {
     let initialized = false
     logForDiagnosticsNoPII('info', 'cli_message_loop_started')
-    process.stderr.write('[dev-trace] stdin loop: reading messages\n');
+    // process.stderr.write('[dev-trace] stdin loop: reading messages\n');
     for await (const message of structuredIO.structuredInput) {
       process.stderr.write(`[dev-trace] stdin: got type=${message.type}\n`);
       // Non-user events are handled inline (no queue). started→completed in
@@ -4186,15 +4189,19 @@ async function runHeadlessStreaming(
       statusListeners.delete(rateLimitListener)
       output.done()
     }
+  } catch (iife_err: any) {
+    process.stderr.write(`[dev-trace] IIFE error: ${iife_err?.stack ?? iife_err}\n`);
+    output.error(iife_err);
+  }
   })()
 
   // Yield to the event loop so the stdin-processing IIFE (void async above)
   // starts its first tick before the caller's for-await begins pulling from
   // output. Without this, the IIFE's microtask never fires and the Stream
   // never receives any enqueue() calls.
-  process.stderr.write('[dev-trace] runHeadlessStreaming: yielding to event loop\n');
+  // process.stderr.write('[dev-trace] runHeadlessStreaming: yielding to event loop\n');
   await new Promise(resolve => setTimeout(resolve, 0))
-  process.stderr.write('[dev-trace] runHeadlessStreaming: returning output\n');
+  // process.stderr.write('[dev-trace] runHeadlessStreaming: returning output\n');
   return output
 }
 
@@ -5246,7 +5253,7 @@ async function loadInitialMessages(
   // Join the SessionStart hooks promise kicked in main.tsx (or run fresh if
   // it wasn't kicked — e.g. --continue with no prior session falls through
   // here with sessionStartHooksPromise undefined because main.tsx guards on continue)
-  process.stderr.write('[dev-trace] loadInitialMessages: awaiting session start hooks\n');
+  // process.stderr.write('[dev-trace] loadInitialMessages: awaiting session start hooks\n');
   const hookMessages = await (options.sessionStartHooksPromise ??
     processSessionStartHooks('startup'))
   process.stderr.write(`[dev-trace] loadInitialMessages: hooks done (${hookMessages.length} messages)\n`);
