@@ -555,6 +555,11 @@ export async function runHeadless(
   headlessProfilerCheckpoint('runHeadless_entry')
 
   // Check Grove requirements for non-interactive consumer subscribers
+  // CRITICAL: Keep the event loop alive. Bun 1.3 may exit prematurely
+  // even with pending Promises if there are no active handles. This ref'd
+  // interval prevents that. Must be set BEFORE any async work.
+  const _earlyKeepAlive = setInterval(() => {}, 30_000);
+
   process.stderr.write('[dev-trace] runHeadless: checking grove\n');
   if (await isQualifiedForGrove()) {
     process.stderr.write('[dev-trace] runHeadless: grove qualified\n');
@@ -874,17 +879,22 @@ export async function runHeadless(
       : null
 
   headlessProfilerCheckpoint('before_runHeadlessStreaming')
-  process.stderr.write('[dev-trace] runHeadless: entering streaming loop\n');
+  process.stderr.write(`[dev-trace] A exitCode=${process.exitCode}\n`);
   // Commander.js sets process.exitCode = 0 after parseAsync() completes the
   // action handler. Bun/Node see exitCode set + empty microtask queue and exit
   // before the async streaming generator produces its first value. Delete
   // exitCode so the process stays alive until gracefulShutdownSync sets it.
-  delete process.exitCode;
-  // Belt-and-suspenders: an unref'd interval that keeps the event loop alive
-  // in case something else re-sets exitCode before the stream starts.
+  process.stderr.write('[dev-trace] B\n');
+  // delete process.exitCode;  // DISABLED — causes Bun to exit
+  process.stderr.write('[dev-trace] C\n');
   const keepAlive = setInterval(() => {}, 60_000);
+  process.stderr.write('[dev-trace] D\n');
+  const _origExit = process.exit;
+  (process as any).exit = (code?: number) => { process.stderr.write(`[dev-trace] EXIT(${code}) at ${new Error().stack?.split('\n')[2]?.trim()}\n`); _origExit(code as any); };
   try {
-  for await (const message of runHeadlessStreaming(
+  let streamIterable: AsyncIterable<any>;
+  try {
+    streamIterable = await runHeadlessStreaming(
     structuredIO,
     appState.mcp.clients,
     [...commands, ...appState.mcp.commands],
@@ -897,7 +907,13 @@ export async function runHeadless(
     agents,
     options,
     turnInterruptionState,
-  )) {
+  );
+  } catch (e: any) {
+    process.stderr.write(`[dev-trace] runHeadlessStreaming THREW: ${e?.message}\n${e?.stack}\n`);
+    throw e;
+  }
+  process.stderr.write('[dev-trace] runHeadless: got streamIterable, iterating...\n');
+  for await (const message of streamIterable) {
     if (transformToStreamlined) {
       // Streamlined mode: transform messages and stream immediately
       const transformed = transformToStreamlined(message)
@@ -999,7 +1015,7 @@ export async function runHeadless(
   )
 }
 
-function runHeadlessStreaming(
+async function runHeadlessStreaming(
   structuredIO: StructuredIO,
   mcpClients: MCPServerConnection[],
   commands: Command[],
@@ -2839,7 +2855,9 @@ function runHeadlessStreaming(
   void (async () => {
     let initialized = false
     logForDiagnosticsNoPII('info', 'cli_message_loop_started')
+    process.stderr.write('[dev-trace] stdin loop: reading messages\n');
     for await (const message of structuredIO.structuredInput) {
+      process.stderr.write(`[dev-trace] stdin: got type=${message.type}\n`);
       // Non-user events are handled inline (no queue). started→completed in
       // the same tick carries no information, so only fire completed.
       // control_response is reported by StructuredIO.processLine (which also
@@ -4149,6 +4167,11 @@ function runHeadlessStreaming(
     }
     inputClosed = true
     cronScheduler?.stop()
+    // Yield to the microtask queue so run() (started with void above) has a
+    // chance to set running=true before we check it. Without this, the
+    // for-await loop exits synchronously and the !running check closes the
+    // output stream before run() ever executes.
+    await new Promise(resolve => setTimeout(resolve, 0))
     if (!running) {
       // If a push-suggestion is in-flight, wait for it to emit before closing
       // the output stream (5 s safety timeout to prevent hanging).
@@ -4165,6 +4188,13 @@ function runHeadlessStreaming(
     }
   })()
 
+  // Yield to the event loop so the stdin-processing IIFE (void async above)
+  // starts its first tick before the caller's for-await begins pulling from
+  // output. Without this, the IIFE's microtask never fires and the Stream
+  // never receives any enqueue() calls.
+  process.stderr.write('[dev-trace] runHeadlessStreaming: yielding to event loop\n');
+  await new Promise(resolve => setTimeout(resolve, 0))
+  process.stderr.write('[dev-trace] runHeadlessStreaming: returning output\n');
   return output
 }
 

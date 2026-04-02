@@ -445,6 +445,13 @@ export function getPublicModelName(model: ModelName): string {
 export function parseUserSpecifiedModel(
   modelInput: ModelName | ModelAlias,
 ): ModelName {
+  // Guard against undefined/null model input (e.g., modelStrings not loaded yet)
+  if (!modelInput) {
+    if (getAPIProvider() === 'openai') {
+      return process.env.ANTHROPIC_MODEL || process.env.OPENAI_MODEL || 'default'
+    }
+    return 'claude-sonnet-4-6' // fallback
+  }
   const modelInputTrimmed = modelInput.trim()
 
   // OpenAI-compatible providers use model names as-is (no alias resolution)
