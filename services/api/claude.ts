@@ -2927,6 +2927,9 @@ export function updateUsage(
   usage: Readonly<NonNullableUsage>,
   partUsage: BetaMessageDeltaUsage | undefined,
 ): NonNullableUsage {
+  if (!usage) {
+    return EMPTY_USAGE
+  }
   if (!partUsage) {
     return { ...usage }
   }
