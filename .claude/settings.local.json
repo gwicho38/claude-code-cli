@@ -1,0 +1,49 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(find /Users/home/repos/claude-code-cli -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -h \"^import\\\\|^export.*from\" {} \\\\;)",
+      "Bash(find /Users/home/repos/claude-code-cli -type f \\\\\\( -name \"*.js\" -o -name \"*.ts\" \\\\\\) -exec grep -l \"build\\\\|bundle\\\\|tsc\\\\|esbuild\" {} \\\\;)",
+      "Bash(find /Users/home/repos/claude-code-cli -type f \\\\\\( -name \"*.ts\" -o -name \"*.tsx\" \\\\\\) -exec grep -h \"from ['\\\\\"]\" {} \\\\;)",
+      "Bash(grep -E \"^/Users/home/repos/claude-code-cli/[^/]+$|package|build\")",
+      "Bash(ls -la /Users/home/repos/claude-code-cli/*.*)",
+      "Bash(sed \"s/.*from ['\\\\\"\\\\`]\\\\\\([^'\\\\\"]\\\\+\\\\\\)['\\\\\"\\\\`].*/\\\\1/\")",
+      "Read(//tmp/**)",
+      "Bash(sed \"s/^.*from\\\\s*['\\\\\"\\\\`]\\\\\\([^'\\\\\"]\\\\+\\\\\\)['\\\\\"\\\\`].*/\\\\1/\")",
+      "Bash(grep -v \"^\\\\\\\\\\(fs\\\\\\\\|path\\\\\\\\|os\\\\\\\\|child_process\\\\\\\\|crypto\\\\\\\\|stream\\\\\\\\|net\\\\\\\\|http\\\\\\\\|https\\\\\\\\|url\\\\\\\\|util\\\\\\\\|events\\\\\\\\|readline\\\\\\\\|tty\\\\\\\\|assert\\\\\\\\|buffer\\\\\\\\|dns\\\\\\\\|zlib\\\\\\\\|worker_threads\\\\\\\\|perf_hooks\\\\\\\\|async_hooks\\\\\\\\|node:\\\\\\\\|bun:\\\\\\\\|tls\\\\\\\\|process\\\\\\\\|zlib\\\\\\\\\\)$\")",
+      "Bash(bun --version)",
+      "Bash(bun install:*)",
+      "Bash(bun run:*)",
+      "Bash(bun upgrade:*)",
+      "Bash(bun add:*)",
+      "Bash(bun:*)",
+      "Bash(ls /Users/home/repos/claude-code-cli/node_modules/react/compiler-runtime*)",
+      "Bash(grep -c 'from \"react/compiler-runtime\"' /Users/home/repos/claude-code-cli/**/*.tsx /Users/home/repos/claude-code-cli/**/**/*.tsx /Users/home/repos/claude-code-cli/**/**/**/*.tsx)",
+      "Bash(grep -v \":0$\")",
+      "Bash(echo \"EXIT CODE: $?\")",
+      "Bash(CLAUDE_CODE_VERSION=1.0.34 bun:*)",
+      "Bash(echo \"EXIT: $?\")",
+      "Bash(timeout 15 NODE_DEBUG=* bun --preload=/Users/home/repos/claude-code-cli/preload.ts /Users/home/repos/claude-code-cli/entrypoints/cli.tsx -p \"2+2\")",
+      "Bash(export NODE_DEBUG=http,https,net)",
+      "Bash(ps -p 10904 -o pid,stat,time,rss)",
+      "Bash(kill 10904)",
+      "Bash(kill 79746)",
+      "Bash(kill 67564)",
+      "Bash(gh api:*)",
+      "Bash(grep -E '\\\\.\\(ts|tsx\\)$')",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "Bash(python3 -c \"import json,sys; d=json.load\\(sys.stdin\\); print\\('module_count:', d['module_count']\\); print\\('sample_files:'\\); [print\\(' ', f\\) for f in d['sample_files'][:20]]\")",
+      "Bash(find /Users/home/repos/claw-code/src -name \"*.py\" -exec sh -c 'head -1 \"$1\" | grep -q \"placeholder\" || echo \"$1\"' _ {} \\\\;)",
+      "Bash(python3:*)",
+      "Bash(find /Users/home/repos/claw-code/src -type f -name \"*.py\" -exec wc -l {} +)",
+      "Bash(ls -lh /Users/home/repos/claw-code/src/*.py)",
+      "Bash([ -f \"/Users/home/repos/claude-code-cli/$f\" ])",
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "WebSearch"
+    ]
+  },
+  "enableAllProjectMcpServers": true,
+  "enabledMcpjsonServers": [
+    "docx-mcp"
+  ]
+}
