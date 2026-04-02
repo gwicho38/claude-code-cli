@@ -1,6 +1,6 @@
 # Missing Source Files
 
-**115 files** are referenced by imports but do not exist on disk, affecting **98 source files**.
+**110 files** remaining (5 resolved). Originally 115, affecting **98 source files**.
 
 Last scanned: 2026-04-02
 
@@ -10,7 +10,7 @@ Last scanned: 2026-04-02
 
 | Category | Count | Impact | Notes |
 |----------|-------|--------|-------|
-| Types / interfaces | 15 | High | Core type definitions used across many files |
+| Types / interfaces | ~~15~~ **10** | High | 5 implemented, 10 remaining |
 | Tool modules | 17 | Medium | Ant-only or feature-gated tools |
 | Skill content (`.md`) | 24 | Low | Documentation strings imported as text |
 | Feature modules | 12 | Medium | Entire subsystems (assistant, ssh, proactive, etc.) |
@@ -41,11 +41,11 @@ Last scanned: 2026-04-02
 
 ### types/ — Core Type Definitions
 
-- [ ] `types/fileSuggestion.ts` — file suggestion types
-- [ ] `types/messageQueueTypes.ts` — message queue types
-- [ ] `types/notebook.ts` — notebook/cell types
-- [ ] `types/statusLine.ts` — status line types
-- [ ] `types/utils.ts` — shared utility types
+- [x] `types/fileSuggestion.ts` — file suggestion hook input (BaseHookInput + query)
+- [x] `types/messageQueueTypes.ts` — QueueOperation, QueueOperationMessage
+- [x] `types/notebook.ts` — nbformat v4.5 types (NotebookCell, NotebookContent, outputs, images)
+- [x] `types/statusLine.ts` — status line hook input (BaseHookInput + session context)
+- [x] `types/utils.ts` — DeepImmutable\<T\>, Permutations\<T\>
 
 ### components/agents/new-agent-creation/ — Agent Creation Types
 
