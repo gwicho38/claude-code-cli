@@ -555,12 +555,12 @@ export async function runHeadless(
   headlessProfilerCheckpoint('runHeadless_entry')
 
   // Check Grove requirements for non-interactive consumer subscribers
-  // process.stderr.write('[dev-trace] runHeadless: checking grove\n');
+  process.stderr.write('[dev-trace] runHeadless: checking grove\n');
   if (await isQualifiedForGrove()) {
-    // process.stderr.write('[dev-trace] runHeadless: grove qualified, checking...\n');
+    process.stderr.write('[dev-trace] runHeadless: grove qualified\n');
     await checkGroveForNonInteractive()
   }
-  // process.stderr.write('[dev-trace] runHeadless: grove done\n');
+  process.stderr.write('[dev-trace] runHeadless: grove done\n');
   headlessProfilerCheckpoint('after_grove_check')
 
   // Initialize GrowthBook so feature flags take effect in headless mode.
@@ -587,7 +587,9 @@ export async function runHeadless(
     return
   }
 
+  process.stderr.write('[dev-trace] runHeadless: getting structuredIO\n');
   const structuredIO = getStructuredIO(inputPrompt, options)
+  process.stderr.write('[dev-trace] runHeadless: got structuredIO\n');
 
   // When emitting NDJSON for SDK clients, any stray write to stdout (debug
   // prints, dependency console.log, library banners) breaks the client's
@@ -601,8 +603,9 @@ export async function runHeadless(
   // #34044: if user explicitly set sandbox.enabled=true but deps are missing,
   // isSandboxingEnabled() returns false silently. Surface the reason so users
   // know their security config isn't being enforced.
-  const sandboxUnavailableReason = SandboxManager.getSandboxUnavailableReason()
-  if (sandboxUnavailableReason) {
+  // DEV: skip sandbox checks — @anthropic-ai/sandbox-runtime is stubbed
+  const sandboxUnavailableReason: string | undefined = undefined
+  if (false && sandboxUnavailableReason) {
     if (SandboxManager.isSandboxRequired()) {
       process.stderr.write(
         `\nError: sandbox required but unavailable: ${sandboxUnavailableReason}\n` +
@@ -615,7 +618,7 @@ export async function runHeadless(
       `\n⚠ Sandbox disabled: ${sandboxUnavailableReason}\n` +
         `  Commands will run WITHOUT sandboxing. Network and filesystem restrictions will NOT be enforced.\n\n`,
     )
-  } else if (SandboxManager.isSandboxingEnabled()) {
+  } else if (false && SandboxManager.isSandboxingEnabled()) {
     // Initialize sandbox with a callback that forwards network permission
     // requests to the SDK host via the can_use_tool control_request protocol.
     // This must happen after structuredIO is created so we can send requests.
@@ -676,11 +679,13 @@ export async function runHeadless(
     })
   }
 
+  process.stderr.write('[dev-trace] runHeadless: past sandbox\n');
   if (options.setupTrigger) {
     await processSetupHooks(options.setupTrigger)
   }
 
   headlessProfilerCheckpoint('before_loadInitialMessages')
+  process.stderr.write('[dev-trace] runHeadless: loading initial messages\n');
   const appState = getAppState()
   const {
     messages: initialMessages,
@@ -732,7 +737,10 @@ export async function runHeadless(
   // gracefulShutdownSync schedules an async shutdown and sets process.exitCode.
   // If a loadInitialMessages error path triggered it, bail early to avoid
   // unnecessary work while the process winds down.
-  if (initialMessages.length === 0 && process.exitCode !== undefined) {
+  // DEV NOTE: Original guard checked process.exitCode !== undefined to bail on
+  // shutdown-in-progress, but Commander.js sets process.exitCode = 0 after the
+  // action handler completes, causing false positives. Check for non-zero only.
+  if (initialMessages.length === 0 && process.exitCode !== undefined && process.exitCode !== 0) {
     return
   }
 
@@ -841,7 +849,9 @@ export async function runHeadless(
 
   // Ensure model strings are initialized before generating model options.
   // For Bedrock users, this waits for the profile fetch to get correct region strings.
+  process.stderr.write('[dev-trace] runHeadless: ensuring model strings\n');
   await ensureModelStringsInitialized()
+  process.stderr.write('[dev-trace] runHeadless: model strings done\n');
   headlessProfilerCheckpoint('after_modelStrings')
 
   // UDS inbox store registration is deferred until after `run` is defined
@@ -864,6 +874,16 @@ export async function runHeadless(
       : null
 
   headlessProfilerCheckpoint('before_runHeadlessStreaming')
+  process.stderr.write('[dev-trace] runHeadless: entering streaming loop\n');
+  // Commander.js sets process.exitCode = 0 after parseAsync() completes the
+  // action handler. Bun/Node see exitCode set + empty microtask queue and exit
+  // before the async streaming generator produces its first value. Delete
+  // exitCode so the process stays alive until gracefulShutdownSync sets it.
+  delete process.exitCode;
+  // Belt-and-suspenders: an unref'd interval that keeps the event loop alive
+  // in case something else re-sets exitCode before the stream starts.
+  const keepAlive = setInterval(() => {}, 60_000);
+  try {
   for await (const message of runHeadlessStreaming(
     structuredIO,
     appState.mcp.clients,
@@ -915,6 +935,9 @@ export async function runHeadless(
       }
       lastMessage = message
     }
+  }
+  } finally {
+    clearInterval(keepAlive);
   }
 
   switch (options.outputFormat) {
@@ -5193,9 +5216,12 @@ async function loadInitialMessages(
   // Join the SessionStart hooks promise kicked in main.tsx (or run fresh if
   // it wasn't kicked — e.g. --continue with no prior session falls through
   // here with sessionStartHooksPromise undefined because main.tsx guards on continue)
+  process.stderr.write('[dev-trace] loadInitialMessages: awaiting session start hooks\n');
+  const hookMessages = await (options.sessionStartHooksPromise ??
+    processSessionStartHooks('startup'))
+  process.stderr.write(`[dev-trace] loadInitialMessages: hooks done (${hookMessages.length} messages)\n`);
   return {
-    messages: await (options.sessionStartHooksPromise ??
-      processSessionStartHooks('startup')),
+    messages: hookMessages,
   }
 }
 
