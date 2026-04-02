@@ -851,7 +851,9 @@ export async function main() {
   // Parse and load settings flags early, before init()
   eagerLoadSettings();
   profileCheckpoint('main_before_run');
+  process.stderr.write('[dev-trace] about to call run()\n');
   await run();
+  process.stderr.write('[dev-trace] run() returned\n');
   profileCheckpoint('main_after_run');
 }
 async function getInputPrompt(prompt: string, inputFormat: 'text' | 'stream-json'): Promise<string | AsyncIterable<string>> {
@@ -911,9 +913,12 @@ async function run(): Promise<CommanderCommand> {
     // Must resolve before init() which triggers the first settings read
     // (applySafeConfigEnvironmentVariables → getSettingsForSource('policySettings')
     // → isRemoteManagedSettingsEligible → sync keychain reads otherwise ~65ms).
+    process.stderr.write('[dev-trace] preAction: waiting for MDM + keychain\n');
     await Promise.all([ensureMdmSettingsLoaded(), ensureKeychainPrefetchCompleted()]);
     profileCheckpoint('preAction_after_mdm');
+    process.stderr.write('[dev-trace] preAction: calling init()\n');
     await init();
+    process.stderr.write('[dev-trace] preAction: init() done\n');
     profileCheckpoint('preAction_after_init');
 
     // process.title on Windows sets the console title directly; on POSIX,
@@ -956,6 +961,7 @@ async function run(): Promise<CommanderCommand> {
     // Must happen after init() to ensure config reading is allowed
     void loadRemoteManagedSettings();
     void loadPolicyLimits();
+    process.stderr.write('[dev-trace] preAction: remote settings/policy loaded\n');
     profileCheckpoint('preAction_after_remote_settings');
 
     // Load settings sync (non-blocking, fail-open)
@@ -1005,6 +1011,7 @@ async function run(): Promise<CommanderCommand> {
   // --plugin-dir takes exactly one arg; repeat the flag for multiple dirs.
   .option('--plugin-dir <path>', 'Load plugins from a directory for this session only (repeatable: --plugin-dir A --plugin-dir B)', (val: string, prev: string[]) => [...prev, val], [] as string[]).option('--disable-slash-commands', 'Disable all skills', () => true).option('--chrome', 'Enable Claude in Chrome integration').option('--no-chrome', 'Disable Claude in Chrome integration').option('--file <specs...>', 'File resources to download at startup. Format: file_id:relative_path (e.g., --file file_abc:doc.txt file_def:img.png)').action(async (prompt, options) => {
     profileCheckpoint('action_handler_start');
+    process.stderr.write('[dev-trace] action handler entered, prompt=' + JSON.stringify(prompt) + '\n');
 
     // --bare = one-switch minimal mode. Sets SIMPLE so all the existing
     // gates fire (CLAUDE.md, skills, hooks inside executeHooks, agent
@@ -1332,6 +1339,7 @@ async function run(): Promise<CommanderCommand> {
 
     // Get isNonInteractiveSession from state (was set before init())
     const isNonInteractiveSession = getIsNonInteractiveSession();
+    process.stderr.write('[dev-trace] isNonInteractive=' + isNonInteractiveSession + ' print=' + print + '\n');
 
     // Validate that fallback model is different from main model
     if (fallbackModel && options.model && fallbackModel === options.model) {
@@ -1775,6 +1783,7 @@ async function run(): Promise<CommanderCommand> {
       // biome-ignore lint/suspicious/noConsole:: intentional console output
       console.error(warning);
     });
+    process.stderr.write('[dev-trace] about to assertMinVersion\n');
     void assertMinVersion();
 
     // claude.ai config fetch: -p mode only (interactive uses useManageMCPConnections
@@ -2556,6 +2565,7 @@ async function run(): Promise<CommanderCommand> {
       // skip — no-op
     } else if (isNonInteractiveSession) {
       // In headless mode, await to ensure plugin sync completes before CLI exits
+      process.stderr.write('[dev-trace] awaiting initializeVersionedPlugins\n');
       await initializeVersionedPlugins();
       profileCheckpoint('action_after_plugins_init');
       void cleanupOrphanedPluginVersionsInBackground().then(() => getGlobExclusionsForPluginCache());
@@ -2582,7 +2592,9 @@ async function run(): Promise<CommanderCommand> {
     }
 
     // --print mode
+    process.stderr.write('[dev-trace] about to enter print-mode branch\n');
     if (isNonInteractiveSession) {
+      process.stderr.write('[dev-trace] IN print mode branch - applying env vars\n');
       if (outputFormat === 'stream-json' || outputFormat === 'json') {
         setHasFormattedOutput(true);
       }
@@ -2610,6 +2622,7 @@ async function run(): Promise<CommanderCommand> {
       // rejection — this just prevents the spurious global handler fire.
       sessionStartHooksPromise?.catch(() => {});
       profileCheckpoint('before_validateForceLoginOrg');
+      process.stderr.write('[dev-trace] validating org\n');
       // Validate org restriction for non-interactive sessions
       const orgValidation = await validateForceLoginOrg();
       if (!orgValidation.valid) {
@@ -2650,6 +2663,14 @@ async function run(): Promise<CommanderCommand> {
       };
 
       // Init app state
+      process.stderr.write('[dev-trace] creating headless store\n');
+      // Intercept process.exit to find who's calling it
+      const origExit = process.exit;
+      (process as any).exit = (code?: number) => {
+        process.stderr.write('[dev-trace] process.exit(' + code + ') called!\n');
+        process.stderr.write('[dev-trace] stack: ' + new Error().stack + '\n');
+        origExit(code as any);
+      };
       const headlessStore = createStore(headlessInitialState, onChangeAppState);
 
       // Check if bypassPermissions should be disabled based on Statsig gate
@@ -2821,12 +2842,17 @@ async function run(): Promise<CommanderCommand> {
         }
       }
       logSessionTelemetry();
+      process.stderr.write('[dev-trace] REACHING runHeadless import\n');
       profileCheckpoint('before_print_import');
+      try {
+        process.stderr.write('[dev-trace] importing src/cli/print.js...\n');
+      } catch(_) {}
       const {
         runHeadless
-      } = await import('src/cli/print.js');
+      } = await import('./cli/print.js');
+      process.stderr.write('[dev-trace] calling runHeadless\n');
       profileCheckpoint('after_print_import');
-      void runHeadless(inputPrompt, () => headlessStore.getState(), headlessStore.setState, commandsHeadless, tools, sdkMcpConfigs, agentDefinitions.activeAgents, {
+      await runHeadless(inputPrompt, () => headlessStore.getState(), headlessStore.setState, commandsHeadless, tools, sdkMcpConfigs, agentDefinitions.activeAgents, {
         continue: options.continue,
         resume: options.resume,
         verbose: verbose,
