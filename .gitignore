@@ -3,6 +3,7 @@ dist/
 release/
 .DS_Store
 .claude/
+.env
 *.log
 *.tmp
 *.swp
