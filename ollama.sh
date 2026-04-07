@@ -13,7 +13,6 @@ ok()   { echo -e "${GREEN}✓${NC} $*"; }
 warn() { echo -e "${YELLOW}!${NC} $*"; }
 
 # ── Load .env ───────────────────────────────────────────────────────────────
-# Project-local .env takes precedence, then ~/.config/claude-local/.env
 CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/claude-local"
 if [[ -f "$SCRIPT_DIR/.env" ]]; then
   set -a; source "$SCRIPT_DIR/.env"; set +a
@@ -26,6 +25,8 @@ OLLAMA_HOST="${OLLAMA_HOST:-https://ollama.lefv.info}"
 LITELLM_HOST="${LITELLM_HOST:-https://litellm.lefv.info}"
 OLLAMA_API_KEY="${OLLAMA_API_KEY:-}"
 OLLAMA_DEFAULT_MODEL="${OLLAMA_DEFAULT_MODEL:-ministral-3-8b-instruct-4bit}"
+OLLAMA_SSH_HOST="${OLLAMA_SSH_HOST:-lefvpc@192.168.8.239}"
+OLLAMA_PROFILES_DIR="${OLLAMA_PROFILES_DIR:-$HOME/repos/claude-code-ollama/deploy/litellm/profiles}"
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}"
 
 # ── Curl with auth ──────────────────────────────────────────────────────────
@@ -40,7 +41,6 @@ ollama_health()  { _curl "${OLLAMA_HOST}/" >/dev/null 2>&1; }
 litellm_health() { _curl "${LITELLM_HOST}/v1/models" >/dev/null 2>&1; }
 
 ollama_models() {
-  # Try LiteLLM /v1/models first (OpenAI format), fall back to Ollama /api/tags
   local litellm_models
   litellm_models=$(_curl "${LITELLM_HOST}/v1/models" 2>/dev/null || true)
   if [[ -n "$litellm_models" ]] && echo "$litellm_models" | jq -e '.data' &>/dev/null; then
@@ -48,6 +48,78 @@ ollama_models() {
     return
   fi
   _curl "${OLLAMA_HOST}/api/tags" 2>/dev/null
+}
+
+# ── Profile management ─────────────────────────────────────────────────────
+# Profiles are LiteLLM config files that route all Claude model aliases to
+# a single Ollama model, preventing GPU memory thrashing on single-GPU setups.
+
+PROFILE_MODEL_MAP=(
+  "ministral:ministral-3-8b-instruct-4bit"
+  "deepseek:deepseek-r1:14b"
+  "qwen3:qwen3:8b"
+  "qwen-coder:qwen2.5-coder:7b"
+)
+
+profile_to_model() {
+  local profile="$1"
+  for entry in "${PROFILE_MODEL_MAP[@]}"; do
+    local pname="${entry%%:*}"
+    local pmodel="${entry#*:}"
+    if [[ "$pname" == "$profile" ]]; then
+      echo "$pmodel"
+      return
+    fi
+  done
+  echo ""
+}
+
+list_profiles() {
+  echo -e "${BOLD}Available profiles:${NC}"
+  echo ""
+  for entry in "${PROFILE_MODEL_MAP[@]}"; do
+    local pname="${entry%%:*}"
+    local pmodel="${entry#*:}"
+    local marker=""
+    local profile_file="${OLLAMA_PROFILES_DIR}/${pname}.yaml"
+    [[ -f "$profile_file" ]] && marker=" ${GREEN}✓${NC}" || marker=" ${DIM}(no config)${NC}"
+    printf "  ${WHITE}%-14s${NC} → ${MAGENTA}%s${NC}%b\n" "$pname" "$pmodel" "$marker"
+  done
+}
+
+switch_profile() {
+  local profile="$1"
+  local profile_file="${OLLAMA_PROFILES_DIR}/${profile}.yaml"
+
+  [[ -f "$profile_file" ]] || die "Profile config not found: ${profile_file}"
+
+  local model
+  model=$(profile_to_model "$profile")
+  [[ -n "$model" ]] || die "Unknown profile: ${profile}. Use --profiles to list."
+
+  info "Switching LiteLLM to profile ${WHITE}${profile}${NC} (${MAGENTA}${model}${NC})"
+
+  # Upload config and restart LiteLLM on the server
+  info "Uploading config to ${OLLAMA_SSH_HOST}..."
+  scp -q "$profile_file" "${OLLAMA_SSH_HOST}:~/litellm/config.yaml" \
+    || die "Failed to SCP config to ${OLLAMA_SSH_HOST}"
+
+  info "Restarting LiteLLM..."
+  ssh -o ConnectTimeout=5 "$OLLAMA_SSH_HOST" \
+    "cd ~/litellm && docker compose restart litellm" 2>&1 \
+    || die "Failed to restart LiteLLM on ${OLLAMA_SSH_HOST}"
+
+  # Wait for LiteLLM to come back
+  local attempts=0
+  while (( attempts < 15 )); do
+    if litellm_health; then
+      ok "LiteLLM restarted with profile ${WHITE}${profile}${NC}"
+      return
+    fi
+    sleep 2
+    (( attempts++ ))
+  done
+  warn "LiteLLM may still be starting — check with --test"
 }
 
 # ── Interactive model picker ────────────────────────────────────────────────
@@ -187,6 +259,19 @@ case "${1:-}" in
   --test|-t)     run_test ;;
   --models|--list|-l) run_list_models ;;
   --pick)        pick_model; launch "$SELECTED_MODEL" ;;
+  --profiles)    list_profiles ;;
+  --profile)
+    [[ -n "${2:-}" ]] || die "Usage: ollama.sh --profile <name> [MODEL] [-- CLI_ARGS...]"
+    profile_name="$2"; shift 2
+    switch_profile "$profile_name"
+    # After switching, launch with the profile's default model or a user-specified one
+    profile_model=$(profile_to_model "$profile_name")
+    model="${1:-$profile_model}"
+    [[ "$model" == "--" ]] && model="$profile_model"
+    [[ "${1:-}" == "--" || "${1:-}" == "" ]] || shift
+    [[ "${1:-}" == "--" ]] && shift
+    launch "$model" "$@"
+    ;;
   --help|-h)
     cat <<USAGE
 Usage: ollama.sh [OPTIONS] [MODEL] [-- CLI_ARGS...]
@@ -197,22 +282,34 @@ Commands:
   (no args)             Launch with default model ($OLLAMA_DEFAULT_MODEL)
   MODEL [args...]       Launch with specific model
   --pick                Interactive model picker
+  --profile NAME        Switch LiteLLM config and launch (prevents GPU thrashing)
+  --profiles            List available profiles
   --test, -t            Test connectivity to Ollama & LiteLLM
   --models, -l          List available models
   --help, -h            Show this help
 
+Profiles:
+  Profiles swap the LiteLLM config on the server so all Claude model aliases
+  route to the same Ollama model. This prevents GPU memory thrashing on
+  single-GPU setups (e.g. RTX 3060 12GB).
+
+  Available: ministral, deepseek, qwen3, qwen-coder
+
 Environment:
-  OLLAMA_HOST           Ollama server  (default: https://ollama.lefv.info)
-  LITELLM_HOST          LiteLLM proxy  (default: https://litellm.lefv.info)
+  OLLAMA_HOST           Ollama server    (default: https://ollama.lefv.info)
+  LITELLM_HOST          LiteLLM proxy    (default: https://litellm.lefv.info)
   OLLAMA_API_KEY        Bearer token for auth proxy
-  OLLAMA_DEFAULT_MODEL  Model to use   (default: ministral-3-8b-instruct-4bit)
+  OLLAMA_DEFAULT_MODEL  Model to use     (default: ministral-3-8b-instruct-4bit)
+  OLLAMA_SSH_HOST       Server SSH target (default: lefvpc@192.168.8.239)
 
 Examples:
-  ./ollama.sh                              # default model
-  ./ollama.sh qwen3:8b                     # specific model
-  ./ollama.sh --pick                       # interactive picker
-  ./ollama.sh --test                       # check connectivity
-  ./ollama.sh qwen3:8b -- -p "explain X"  # pass args to CLI
+  ./ollama.sh                                  # default model
+  ./ollama.sh qwen3:8b                         # specific model (no profile switch)
+  ./ollama.sh --profile deepseek               # switch + launch deepseek
+  ./ollama.sh --profile qwen3 qwen3:8b-notk    # switch to qwen3 profile, use notk variant
+  ./ollama.sh --profile ministral -- -p "hi"   # switch + pass CLI args
+  ./ollama.sh --profiles                       # list available profiles
+  ./ollama.sh --test                           # check connectivity
 USAGE
     exit 0
     ;;
