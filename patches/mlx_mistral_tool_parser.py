@@ -13,10 +13,37 @@ from typing import Any
 
 import regex as re
 
-_tool_call_regex = re.compile(r"\s*(\w+)\[ARGS\]\s*(\{.*\})", re.DOTALL)
+_tool_call_regex = re.compile(r"\s*(\w+)\[ARGS\]\s*(\{)", re.DOTALL)
 
 tool_call_start = "[TOOL_CALLS]"
 tool_call_end = ""
+
+
+def _extract_first_json_object(text: str, start: int) -> str:
+    """Extract the first balanced JSON object starting at position start."""
+    depth = 0
+    in_string = False
+    escape = False
+    for i in range(start, len(text)):
+        c = text[i]
+        if escape:
+            escape = False
+            continue
+        if c == '\\' and in_string:
+            escape = True
+            continue
+        if c == '"' and not escape:
+            in_string = not in_string
+            continue
+        if in_string:
+            continue
+        if c == '{':
+            depth += 1
+        elif c == '}':
+            depth -= 1
+            if depth == 0:
+                return text[start:i + 1]
+    return text[start:]
 
 
 def parse_tool_call(text: str, tools: Any | None = None):
@@ -24,7 +51,9 @@ def parse_tool_call(text: str, tools: Any | None = None):
     match = _tool_call_regex.search(text)
     if match is not None:
         func_name = match.group(1)
-        func_args = json.loads(match.group(2))
+        json_start = match.start(2)
+        json_str = _extract_first_json_object(text, json_start)
+        func_args = json.loads(json_str)
         return dict(name=func_name, arguments=func_args)
 
     # Fallback: standard JSON format [{"name": "...", "arguments": {...}}]

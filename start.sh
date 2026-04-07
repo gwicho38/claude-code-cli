@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "$(readlink -f "$0" 2>/dev/null || realpath "$0" 2>/dev/null || echo "$0")")" && pwd)"
 
 # Provider selection: first positional arg or PROVIDER env var; default mlx
 PROVIDER="${1:-${PROVIDER:-mlx}}"
@@ -89,4 +89,5 @@ print('Patched tokenizer_config.json with tool_parser_type: mistral')
     ;;
 esac
 
+cd "$SCRIPT_DIR"
 exec bun --preload="$SCRIPT_DIR/preload.ts" "$SCRIPT_DIR/entrypoints/cli.tsx" "$@"
