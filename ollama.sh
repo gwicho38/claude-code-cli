@@ -163,11 +163,18 @@ launch() {
   echo -e "${GREEN}Launching${NC} ${BOLD}Claude Code CLI${NC} → ${CYAN}${LITELLM_HOST}${NC} / ${MAGENTA}${BOLD}${model}${NC}"
   echo ""
 
+  # Clear any OpenAI provider env vars so the CLI uses firstParty (Anthropic) path
+  unset OPENAI_BASE_URL OPENAI_API_KEY CLAUDE_CODE_USE_OPENAI
+  unset OLLAMA_BASE_URL CLAUDE_CODE_USE_OLLAMA
+
   # Point at LiteLLM proxy (Anthropic Messages API compatible)
   export ANTHROPIC_BASE_URL="${LITELLM_HOST}"
   export ANTHROPIC_API_KEY="${OLLAMA_API_KEY:-not-needed}"
   export ANTHROPIC_MODEL="${model}"
   export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC}"
+
+  # Local models can't handle Claude-specific features
+  export CLAUDE_CODE_DISABLE_THINKING=1
 
   cd "$SCRIPT_DIR"
   exec bun --preload="$SCRIPT_DIR/preload.ts" "$SCRIPT_DIR/entrypoints/cli.tsx" "$@"
