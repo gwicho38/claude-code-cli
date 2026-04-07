@@ -245,10 +245,16 @@ launch() {
   export ANTHROPIC_MODEL="${model}"
   export CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC}"
 
+  # Force ALL internal model references to the same model to prevent Ollama
+  # from evicting the loaded model for background requests (haiku, sonnet, etc.)
+  export ANTHROPIC_SMALL_FAST_MODEL="${model}"
+
   # Local models can't handle Claude-specific features
   export CLAUDE_CODE_DISABLE_THINKING=1
-  # Cap tools to avoid 87K+ token prompts that overflow local model context windows
-  export CLAUDE_CODE_MAX_TOOLS="${CLAUDE_CODE_MAX_TOOLS:-15}"
+  # Cap tools to keep prompts within local model context windows.
+  # Default 0 = pure chat mode (no tool-call JSON in output).
+  # Set to 15 for tool use (model may output JSON tool calls as text).
+  export CLAUDE_CODE_MAX_TOOLS="${CLAUDE_CODE_MAX_TOOLS:-0}"
 
   cd "$SCRIPT_DIR"
   exec bun --preload="$SCRIPT_DIR/preload.ts" "$SCRIPT_DIR/entrypoints/cli.tsx" "$@"

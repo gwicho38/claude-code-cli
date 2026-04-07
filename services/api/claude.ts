@@ -1373,6 +1373,20 @@ async function* queryModel(
   // Prepend system prompt block for easy API identification
   logAPIPrefix(systemPrompt)
 
+  // When CLAUDE_CODE_MAX_TOOLS is set, we're targeting a local model via LiteLLM.
+  // The full Claude system prompt is 80K+ tokens — far too large for local models
+  // with 32K context windows. Replace it entirely with a minimal prompt.
+  if (process.env.CLAUDE_CODE_MAX_TOOLS) {
+    systemPrompt = asSystemPrompt([
+      'You are a helpful AI coding assistant running in a CLI terminal. ' +
+      'Respond in plain text. Do NOT output JSON, tool calls, or structured data unless explicitly asked. ' +
+      'Keep responses concise, direct, and focused on the user\'s question. ' +
+      'You have access to tools for reading files, editing code, running commands, and searching. ' +
+      'Use tools when the user asks you to interact with the codebase. ' +
+      'For conversational questions, just respond with text.',
+    ])
+  }
+
   const enablePromptCaching =
     options.enablePromptCaching ?? getPromptCachingEnabled(options.model)
   const system = buildSystemPromptBlocks(systemPrompt, enablePromptCaching, {
