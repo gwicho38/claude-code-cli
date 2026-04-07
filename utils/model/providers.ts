@@ -100,7 +100,7 @@ export function getOllamaBaseUrl(): string {
 export function getOllamaModel(): string {
   return (
     process.env.OLLAMA_MODEL ||
-    'ministral-3-8b-instruct-4bit:latest'
+    'ministral-3-8b-instruct-4bit'
   )
 }
 

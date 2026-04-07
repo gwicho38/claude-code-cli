@@ -25,7 +25,7 @@ fi
 OLLAMA_HOST="${OLLAMA_HOST:-https://ollama.lefv.info}"
 LITELLM_HOST="${LITELLM_HOST:-https://litellm.lefv.info}"
 OLLAMA_API_KEY="${OLLAMA_API_KEY:-}"
-OLLAMA_DEFAULT_MODEL="${OLLAMA_DEFAULT_MODEL:-ministral-3-8b-instruct-4bit:latest}"
+OLLAMA_DEFAULT_MODEL="${OLLAMA_DEFAULT_MODEL:-ministral-3-8b-instruct-4bit}"
 CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC="${CLAUDE_CODE_DISABLE_NONESSENTIAL_TRAFFIC:-1}"
 
 # ── Curl with auth ──────────────────────────────────────────────────────────
@@ -196,7 +196,7 @@ Environment:
   OLLAMA_HOST           Ollama server  (default: https://ollama.lefv.info)
   LITELLM_HOST          LiteLLM proxy  (default: https://litellm.lefv.info)
   OLLAMA_API_KEY        Bearer token for auth proxy
-  OLLAMA_DEFAULT_MODEL  Model to use   (default: ministral-3-8b-instruct-4bit:latest)
+  OLLAMA_DEFAULT_MODEL  Model to use   (default: ministral-3-8b-instruct-4bit)
 
 Examples:
   ./ollama.sh                              # default model

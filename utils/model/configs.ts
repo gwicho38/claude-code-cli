@@ -12,7 +12,7 @@ export const CLAUDE_3_7_SONNET_CONFIG = {
   vertex: 'claude-3-7-sonnet@20250219',
   foundry: 'claude-3-7-sonnet',
   openai: 'claude-3-7-sonnet-20250219',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.3-codex',
 } as const satisfies ModelConfig
 
@@ -22,7 +22,7 @@ export const CLAUDE_3_5_V2_SONNET_CONFIG = {
   vertex: 'claude-3-5-sonnet-v2@20241022',
   foundry: 'claude-3-5-sonnet',
   openai: 'claude-3-5-sonnet-20241022',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.3-codex',
 } as const satisfies ModelConfig
 
@@ -32,7 +32,7 @@ export const CLAUDE_3_5_HAIKU_CONFIG = {
   vertex: 'claude-3-5-haiku@20241022',
   foundry: 'claude-3-5-haiku',
   openai: 'claude-3-5-haiku-20241022',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4-mini',
 } as const satisfies ModelConfig
 
@@ -42,7 +42,7 @@ export const CLAUDE_HAIKU_4_5_CONFIG = {
   vertex: 'claude-haiku-4-5@20251001',
   foundry: 'claude-haiku-4-5',
   openai: 'claude-haiku-4-5-20251001',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4-mini',
 } as const satisfies ModelConfig
 
@@ -52,7 +52,7 @@ export const CLAUDE_SONNET_4_CONFIG = {
   vertex: 'claude-sonnet-4@20250514',
   foundry: 'claude-sonnet-4',
   openai: 'claude-sonnet-4-20250514',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.3-codex',
 } as const satisfies ModelConfig
 
@@ -62,7 +62,7 @@ export const CLAUDE_SONNET_4_5_CONFIG = {
   vertex: 'claude-sonnet-4-5@20250929',
   foundry: 'claude-sonnet-4-5',
   openai: 'claude-sonnet-4-5-20250929',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.3-codex',
 } as const satisfies ModelConfig
 
@@ -72,7 +72,7 @@ export const CLAUDE_OPUS_4_CONFIG = {
   vertex: 'claude-opus-4@20250514',
   foundry: 'claude-opus-4',
   openai: 'claude-opus-4-20250514',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4',
 } as const satisfies ModelConfig
 
@@ -82,7 +82,7 @@ export const CLAUDE_OPUS_4_1_CONFIG = {
   vertex: 'claude-opus-4-1@20250805',
   foundry: 'claude-opus-4-1',
   openai: 'claude-opus-4-1-20250805',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4',
 } as const satisfies ModelConfig
 
@@ -92,7 +92,7 @@ export const CLAUDE_OPUS_4_5_CONFIG = {
   vertex: 'claude-opus-4-5@20251101',
   foundry: 'claude-opus-4-5',
   openai: 'claude-opus-4-5-20251101',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4',
 } as const satisfies ModelConfig
 
@@ -102,7 +102,7 @@ export const CLAUDE_OPUS_4_6_CONFIG = {
   vertex: 'claude-opus-4-6',
   foundry: 'claude-opus-4-6',
   openai: 'claude-opus-4-6',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.4',
 } as const satisfies ModelConfig
 
@@ -112,7 +112,7 @@ export const CLAUDE_SONNET_4_6_CONFIG = {
   vertex: 'claude-sonnet-4-6',
   foundry: 'claude-sonnet-4-6',
   openai: 'claude-sonnet-4-6',
-  ollama: 'ministral-3-8b-instruct-4bit:latest',
+  ollama: 'ministral-3-8b-instruct-4bit',
   codex: 'gpt-5.3-codex',
 } as const satisfies ModelConfig
 
