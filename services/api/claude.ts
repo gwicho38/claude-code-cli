@@ -1395,7 +1395,21 @@ async function* queryModel(
       model: advisorModel,
     } as unknown as BetaToolUnion)
   }
-  const allTools = [...toolSchemas, ...extraToolSchemas]
+  let allTools = [...toolSchemas, ...extraToolSchemas]
+
+  // CLAUDE_CODE_MAX_TOOLS caps tool definitions for local/proxy models
+  // whose context windows can't handle 200+ tool schemas (87K+ tokens).
+  // Core tools are prioritised so the model can still read/write/search.
+  const maxToolsEnv = parseInt(process.env.CLAUDE_CODE_MAX_TOOLS || '0', 10)
+  if (maxToolsEnv > 0 && allTools.length > maxToolsEnv) {
+    const coreToolNames = new Set([
+      'Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep', 'Agent',
+      'WebFetch', 'WebSearch', 'TaskCreate', 'TaskUpdate',
+    ])
+    const core = allTools.filter(t => 'name' in t && coreToolNames.has(t.name))
+    const rest = allTools.filter(t => !('name' in t) || !coreToolNames.has(t.name))
+    allTools = [...core, ...rest].slice(0, maxToolsEnv)
+  }
 
   const isFastMode =
     isFastModeEnabled() &&

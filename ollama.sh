@@ -175,6 +175,8 @@ launch() {
 
   # Local models can't handle Claude-specific features
   export CLAUDE_CODE_DISABLE_THINKING=1
+  # Cap tools to avoid 87K+ token prompts that overflow local model context windows
+  export CLAUDE_CODE_MAX_TOOLS="${CLAUDE_CODE_MAX_TOOLS:-15}"
 
   cd "$SCRIPT_DIR"
   exec bun --preload="$SCRIPT_DIR/preload.ts" "$SCRIPT_DIR/entrypoints/cli.tsx" "$@"
