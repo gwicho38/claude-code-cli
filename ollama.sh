@@ -236,9 +236,11 @@ launch() {
   echo -e "${GREEN}Launching${NC} ${BOLD}Claude Code CLI${NC} → ${CYAN}${LITELLM_HOST}${NC} / ${MAGENTA}${BOLD}${model}${NC}"
   echo ""
 
-  # Clear any OpenAI provider env vars so the CLI uses firstParty (Anthropic) path
+  # Clear any conflicting env vars and auth tokens
   unset OPENAI_BASE_URL OPENAI_API_KEY CLAUDE_CODE_USE_OPENAI
   unset OLLAMA_BASE_URL CLAUDE_CODE_USE_OLLAMA
+  # Prevent "Auth conflict: Both a token (claude.ai) and an API key" warning
+  unset ANTHROPIC_AUTH_TOKEN
 
   # Point at LiteLLM proxy (Anthropic Messages API compatible)
   export ANTHROPIC_BASE_URL="${LITELLM_HOST}"
