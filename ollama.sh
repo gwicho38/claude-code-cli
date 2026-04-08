@@ -105,13 +105,14 @@ switch_profile() {
     || die "Failed to SCP config to ${OLLAMA_SSH_HOST}"
 
   info "Restarting LiteLLM..."
-  ssh -o ConnectTimeout=5 "$OLLAMA_SSH_HOST" \
-    "cd ~/litellm && docker compose restart litellm" 2>&1 \
+  ssh -o ConnectTimeout=5 -o LogLevel=ERROR "$OLLAMA_SSH_HOST" \
+    "cd ~/litellm && docker compose restart litellm 2>&1" \
     || die "Failed to restart LiteLLM on ${OLLAMA_SSH_HOST}"
 
   # Wait for LiteLLM to come back
+  info "Waiting for LiteLLM to be ready..."
   local attempts=0
-  while (( attempts < 15 )); do
+  while (( attempts < 20 )); do
     if litellm_health; then
       ok "LiteLLM restarted with profile ${WHITE}${profile}${NC}"
       return
@@ -119,7 +120,7 @@ switch_profile() {
     sleep 2
     (( attempts++ ))
   done
-  warn "LiteLLM may still be starting — check with --test"
+  warn "LiteLLM may still be starting — launching CLI anyway"
 }
 
 # ── Interactive model picker ────────────────────────────────────────────────
